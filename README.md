@@ -91,5 +91,6 @@ project_folder/
 ├── package.txt
 ├── requirements.txt
 STREAMLIT
+https://nellydetect-bdcnp8su8xfh7tlaip4eas.streamlit.app/
 
 
