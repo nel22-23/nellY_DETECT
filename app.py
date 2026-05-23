@@ -200,7 +200,6 @@ st.markdown("""
 </div>
 
 <div class="subtitle">
-Real-Time AI Detection using YOLOv8 + Streamlit
 </div>
 """, unsafe_allow_html=True)
 
