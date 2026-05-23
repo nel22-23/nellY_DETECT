@@ -90,5 +90,6 @@ project_folder/
 ├── app.py
 ├── package.txt
 ├── requirements.txt
-└── yolov8s.pt
-└── yolov8s.pt
+STREAMLIT
+
+
