@@ -1,20 +1,32 @@
 import subprocess
 import sys
-
-try:
-    import tornado
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "tornado"])
-
-try:
-    from twilio.rest import Client
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "twilio"])
-    from twilio.rest import Client
-
 import os
-os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
+# =========================
+# INSTALL MISSING PACKAGES
+# =========================
+
+required_packages = [
+    ("tornado", "tornado"),
+    ("twilio", "twilio"),
+    ("streamlit_webrtc", "streamlit-webrtc"),
+    ("ultralytics", "ultralytics"),
+    ("av", "av")
+]
+
+for package_name, import_name in required_packages:
+    try:
+        __import__(import_name)
+    except ImportError:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", package_name]
+        )
+
+# =========================
+# IMPORTS
+# =========================
+
+from twilio.rest import Client
 import streamlit as st
 import av
 import cv2
@@ -23,12 +35,26 @@ import io
 import zipfile
 from datetime import datetime
 from ultralytics import YOLO
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
+from streamlit_webrtc import (
+    webrtc_streamer,
+    WebRtcMode,
+    VideoProcessorBase
+)
+
+# =========================
+# STREAMLIT CONFIG
+# =========================
+
+os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 st.set_page_config(
-    page_title="📹 Live Object Detection & Tracing",
+    page_title="📹 Live Object Detection",
     layout="wide"
 )
+
+# =========================
+# SAVE DIRECTORY
+# =========================
 
 SAVE_DIR = "detection_logs"
 os.makedirs(SAVE_DIR, exist_ok=True)
@@ -37,7 +63,7 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 # TWILIO CONFIG
 # =========================
 
-TWILIO_ACCOUNT_SID = "ACcd3c04d2fc8d40b43f6921f4d08b9403"
+TWILIO_ACCOUNT_SID = "YOUR_ACCOUNT_SID"
 TWILIO_AUTH_TOKEN = "YOUR_AUTH_TOKEN"
 TWILIO_PHONE_NUMBER = "+1234567890"
 ALERT_PHONE_NUMBER = "+639123456789"
@@ -47,8 +73,9 @@ twilio_client = Client(
     TWILIO_AUTH_TOKEN
 )
 
-if "gallery_mode" not in st.session_state:
-    st.session_state.gallery_mode = False
+# =========================
+# LOAD MODEL
+# =========================
 
 @st.cache_resource
 def load_model():
@@ -57,6 +84,10 @@ def load_model():
 model = load_model()
 CLASS_NAMES = list(model.names.values())
 
+# =========================
+# MODERN WHITE UI DESIGN
+# =========================
+
 st.markdown("""
 <style>
 
@@ -64,82 +95,86 @@ html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
 }
 
+/* MAIN BACKGROUND */
 .stApp {
-    background: linear-gradient(135deg, #0f172a, #111827, #1e293b);
-    color: #f8fafc;
+    background: #ffffff;
+    color: #111827;
 }
 
+/* TITLE */
 .title {
     text-align: center;
-    font-size: clamp(35px, 5vw, 60px);
+    font-size: clamp(35px, 5vw, 58px);
     font-weight: 900;
-    color: #38bdf8;
-    text-shadow: 0px 0px 20px rgba(56,189,248,0.7);
+    color: #2563eb;
     margin-bottom: 5px;
 }
 
+/* SUBTITLE */
 .subtitle {
     text-align: center;
-    color: #cbd5e1;
+    color: #475569;
     font-size: 18px;
     margin-bottom: 30px;
 }
 
+/* PANELS */
 .panel {
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(56,189,248,0.3);
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #dbeafe;
     padding: 25px;
-    border-radius: 20px;
-    box-shadow: 0 0 25px rgba(56,189,248,0.15);
-    backdrop-filter: blur(12px);
+    border-radius: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
 }
 
+/* SIDEBAR */
+section[data-testid="stSidebar"] {
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+}
+
+/* BUTTONS */
 .stButton > button {
-    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
     color: white;
     border: none;
-    border-radius: 14px;
+    border-radius: 12px;
     padding: 12px 24px;
     font-weight: 700;
-    transition: all 0.3s ease;
-    box-shadow: 0 0 15px rgba(14,165,233,0.35);
+    transition: 0.3s;
 }
 
 .stButton > button:hover {
-    transform: scale(1.05);
-    background: linear-gradient(135deg, #0284c7, #1d4ed8);
+    transform: scale(1.03);
 }
 
+/* DOWNLOAD BUTTON */
 .stDownloadButton > button {
-    background: linear-gradient(135deg, #22c55e, #15803d) !important;
+    background: linear-gradient(135deg, #16a34a, #22c55e) !important;
+    color: white !important;
 }
 
-.stDownloadButton > button:hover {
-    background: linear-gradient(135deg, #16a34a, #166534) !important;
-}
-
-section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #111827, #0f172a);
-    border-right: 1px solid rgba(56,189,248,0.2);
-}
-
+/* LABELS */
 .stSlider label,
 .stSelectbox label,
 .stToggle label {
-    color: #e2e8f0 !important;
+    color: #111827 !important;
     font-weight: 600;
 }
 
+/* IMAGES */
 img {
     border-radius: 18px;
-    border: 2px solid rgba(56,189,248,0.25);
-    box-shadow: 0 0 25px rgba(56,189,248,0.15);
+    border: 2px solid #dbeafe;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
+/* CONTAINER */
 .block-container {
     padding-top: 2rem;
 }
 
+/* HIDE STREAMLIT DEFAULTS */
 #MainMenu {
     visibility: hidden;
 }
@@ -155,13 +190,23 @@ header {
 </style>
 """, unsafe_allow_html=True)
 
+# =========================
+# HEADER
+# =========================
+
 st.markdown("""
-<div class="title">📹 Live Object Detection & Tracing</div>
+<div class="title">
+📹 Live Object Detection & Tracing
+</div>
 
 <div class="subtitle">
 Real-Time AI Detection using YOLOv8 + Streamlit
 </div>
 """, unsafe_allow_html=True)
+
+# =========================
+# SIDEBAR
+# =========================
 
 with st.sidebar:
 
@@ -190,6 +235,10 @@ with st.sidebar:
         value=True
     )
 
+# =========================
+# VIDEO PROCESSOR
+# =========================
+
 class VideoProcessor(VideoProcessorBase):
 
     def __init__(self):
@@ -210,22 +259,28 @@ class VideoProcessor(VideoProcessorBase):
         )
 
         detected_counts = {}
-
         current_objects = set()
-
         alert_detected = False
 
         if results and results[0].boxes is not None:
 
             for box in results[0].boxes:
 
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                x1, y1, x2, y2 = map(
+                    int,
+                    box.xyxy[0]
+                )
 
                 cls_id = int(box.cls[0])
 
-                label = model.names.get(cls_id, "unknown")
+                label = model.names.get(
+                    cls_id,
+                    "unknown"
+                )
 
-                detected_counts[label] = detected_counts.get(label, 0) + 1
+                detected_counts[label] = (
+                    detected_counts.get(label, 0) + 1
+                )
 
                 current_objects.add(label)
 
@@ -234,7 +289,7 @@ class VideoProcessor(VideoProcessorBase):
 
                 if show_boxes:
 
-                    color = (56, 189, 248)
+                    color = (37, 99, 235)
 
                     if label == target_object:
                         color = (0, 0, 255)
@@ -249,7 +304,7 @@ class VideoProcessor(VideoProcessorBase):
 
                     cv2.putText(
                         img,
-                        f"{label}",
+                        label,
                         (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.8,
@@ -258,19 +313,20 @@ class VideoProcessor(VideoProcessorBase):
                     )
 
         # =========================
-        # SEND TWILIO SMS ALERT
+        # TWILIO ALERT
         # =========================
 
         if alert_detected and not self.alert_sent:
 
             try:
+
                 twilio_client.messages.create(
-                    body=f"🚨 ALERT: {target_object.upper()} detected by YOLOv8 system.",
+                    body=f"🚨 ALERT: {target_object.upper()} detected.",
                     from_=TWILIO_PHONE_NUMBER,
                     to=ALERT_PHONE_NUMBER
                 )
 
-                print("SMS Alert Sent!")
+                print("SMS Sent!")
 
             except Exception as e:
                 print("Twilio Error:", e)
@@ -280,7 +336,13 @@ class VideoProcessor(VideoProcessorBase):
         if not alert_detected:
             self.alert_sent = False
 
-        total_objects = sum(detected_counts.values())
+        # =========================
+        # INFO PANEL
+        # =========================
+
+        total_objects = sum(
+            detected_counts.values()
+        )
 
         overlay = img.copy()
 
@@ -288,15 +350,15 @@ class VideoProcessor(VideoProcessorBase):
             overlay,
             (10, 10),
             (350, 140),
-            (15, 23, 42),
+            (255, 255, 255),
             -1
         )
 
         cv2.addWeighted(
             overlay,
-            0.7,
+            0.75,
             img,
-            0.3,
+            0.25,
             0,
             img
         )
@@ -307,7 +369,7 @@ class VideoProcessor(VideoProcessorBase):
             (25, 45),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.9,
-            (56, 189, 248),
+            (37, 99, 235),
             2
         )
 
@@ -321,15 +383,21 @@ class VideoProcessor(VideoProcessorBase):
                 (25, y_position),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (255, 255, 255),
+                (0, 0, 0),
                 2
             )
 
             y_position += 30
 
+        # =========================
+        # ALERT BANNER
+        # =========================
+
         if alert_detected:
 
-            alert_text = f"ALERT: {target_object.upper()} DETECTED"
+            alert_text = (
+                f"ALERT: {target_object.upper()} DETECTED"
+            )
 
             (text_width, text_height), _ = cv2.getTextSize(
                 alert_text,
@@ -356,7 +424,9 @@ class VideoProcessor(VideoProcessorBase):
                 2
             )
 
-            print("\a")
+        # =========================
+        # SAVE IMAGE
+        # =========================
 
         if save_images and current_objects != self.prev_objects:
 
@@ -378,7 +448,14 @@ class VideoProcessor(VideoProcessorBase):
             format="bgr24"
         )
 
-st.markdown('<div class="panel">', unsafe_allow_html=True)
+# =========================
+# LIVE CAMERA
+# =========================
+
+st.markdown(
+    '<div class="panel">',
+    unsafe_allow_html=True
+)
 
 webrtc_streamer(
     key="object-detection",
@@ -391,17 +468,28 @@ webrtc_streamer(
     async_processing=True
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
+st.markdown(
+    '</div>',
+    unsafe_allow_html=True
+)
+
+# =========================
+# GALLERY
+# =========================
 
 st.markdown("## 📂 Detection Gallery")
 
-image_files = glob.glob(os.path.join(SAVE_DIR, "*.jpg"))
+image_files = glob.glob(
+    os.path.join(SAVE_DIR, "*.jpg")
+)
 
 if image_files:
 
     cols = st.columns(3)
 
-    for index, img_path in enumerate(reversed(image_files[-9:])):
+    for index, img_path in enumerate(
+        reversed(image_files[-9:])
+    ):
 
         with cols[index % 3]:
 
@@ -436,4 +524,5 @@ if image_files:
     )
 
 else:
+
     st.info("No saved detections yet.")
